@@ -451,7 +451,8 @@ _rpc__SGX_Quote(
         }
 
         // read back quote
-        bytes = rw_file_f("/dev/attestation/quote", (char*)quote, sizeof(SGX_QUOTE_MAX_SIZE), false);
+        memset((void*)quote, 0, SGX_QUOTE_MAX_SIZE);
+        bytes = rw_file_f("/dev/attestation/quote", (char*)quote, SGX_QUOTE_MAX_SIZE, false);
         if (bytes < 0) {
             // error is already printed by rw_file_f()
             return false;
