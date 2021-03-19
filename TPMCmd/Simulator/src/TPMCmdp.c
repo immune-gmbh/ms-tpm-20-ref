@@ -41,6 +41,11 @@
 
 //** Includes and Data Definitions
 #include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include "TpmBuildSwitches.h"
 
 #ifdef _MSC_VER
@@ -409,7 +414,7 @@ _rpc__SGX_PlatformID(
         }
 
         // get 2nd half of 256 bit platform ID
-        platIdKeyRequest.key_id[0] = 23;
+        platIdKeyRequest.key_id.id[0] = 23;
         if(sgx_getkey(&platIdKeyRequest, &key[1]) != 0)
         {
             fprintf(stderr, "EGETKEY 1 failed\n");
@@ -466,8 +471,8 @@ _rpc__SGX_Quote(
             return false;
         }
 
-        int ret = memcmp(typed_quote->report_body.report_data.d, user_report_data.d,
-                        sizeof(user_report_data));
+        int ret = memcmp(typed_quote->report_body.report_data.d, userReportData,
+                        SGX_REPORT_DATA_SIZE);
         if (ret) {
             fprintf(stderr, "comparison of report data in SGX quote failed\n");
             return false;

@@ -44,6 +44,7 @@
 
 // need SGX defines
 #include "sgx_arch.h"
+#include "sgx_attest.h"
 
 #ifdef _MSC_VER
 #   pragma warning(push, 3)
@@ -258,7 +259,7 @@ PlatformServer(
                 uint8_t userReportData[SGX_REPORT_DATA_SIZE];
                 uint8_t quote[SGX_QUOTE_MAX_SIZE];
 
-                OK = ReadBytes(s, userReportData, sizeof(userReportData));
+                OK = ReadBytes(s, (char*)userReportData, sizeof(userReportData));
 
                 // close connection in case of error instead of
                 // returning invalid data

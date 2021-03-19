@@ -32,10 +32,13 @@
 
 include src.mk
 
+GRAPHENE_PAL_INC = -I $(srcdir)/../../graphene/Pal/src/host/Linux-SGX \
+		   -I $(srcdir)/../../graphene/Pal/include/pal
 PLATFORM_INC = -I $(srcdir)/Platform/include \
     -I $(srcdir)/Platform/include/prototypes
 SIMULATOR_INC =  -I $(srcdir)/Simulator/include \
-    -I $(srcdir)/Simulator/include/prototypes
+    -I $(srcdir)/Simulator/include/prototypes \
+    $(GRAPHENE_PAL_INC)
 TPM_INC = -I $(srcdir)/tpm/include \
     -I $(srcdir)/tpm/include/prototypes
 
