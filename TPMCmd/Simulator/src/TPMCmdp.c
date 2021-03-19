@@ -67,9 +67,63 @@
 #include "TpmTcpProtocol.h"
 #include "Simulator_fp.h"
 
+#include "sgx_arch.h"
+#include "sgx_api.h"
+#include "sgx_attest.h"
+
 static bool     s_isPowerOn = false;
 
 //** Functions
+
+//*** rw_file()
+// Local utility function taken from graphene examples for sgx attestation quote
+static ssize_t rw_file_f(const char* path, char* buf, size_t bytes, bool do_write) {
+    ssize_t rv = 0;
+    ssize_t ret = 0;
+
+    int fd = open(path, do_write ? O_WRONLY : O_RDONLY);
+    if (fd < 0) {
+        fprintf(stderr, "opening %s failed\n", path);
+        return fd;
+    }
+
+    while (bytes > rv) {
+        if (do_write)
+            ret = write(fd, buf + rv, bytes - rv);
+        else
+            ret = read(fd, buf + rv, bytes - rv);
+
+        if (ret > 0) {
+            rv += ret;
+        } else if (ret == 0) {
+            /* end of file */
+            if (rv == 0)
+                fprintf(stderr, "%s failed: unexpected end of file\n", do_write ? "write" : "read");
+            break;
+        } else {
+            if (ret < 0 && (errno == EAGAIN || errno == EINTR)) {
+                continue;
+            } else {
+                fprintf(stderr, "%s failed: %s\n", do_write ? "write" : "read", strerror(errno));
+                goto out;
+            }
+        }
+    }
+
+out:
+    if (ret < 0) {
+        /* error path */
+        close(fd);
+        return ret;
+    }
+
+    ret = close(fd);
+    if (ret < 0) {
+        fprintf(stderr, "closing %s failed\n", path);
+        return ret;
+    }
+    return rv;
+}
 
 //*** Signal_PowerOn()
 // This function processes a power-on indication. Among other things, it
@@ -328,3 +382,99 @@ _rpc__ACT_GetSignaled(
     return false;
 }
 
+//*** _rpc__SGX_PlatformID()
+// Use SGX EGETKEY mechanism to derive a processor package unique 256 bit ID
+bool
+_rpc__SGX_PlatformID(
+    uint8_t *platformID
+)
+{
+    // If TPM power is on...
+    if (s_isPowerOn)
+    {
+        __sgx_mem_aligned sgx_key_128bit_t key[2];
+        __sgx_mem_aligned sgx_key_request_t platIdKeyRequest;
+        memset((void*)&key, 0, sizeof(key));
+        memset((void*)&platIdKeyRequest, 0, sizeof(platIdKeyRequest));
+
+        // seals keys are usually bound to an enclave
+        // use 0 in all other fields to bind the key only to the platform and not to enclave measurements
+        platIdKeyRequest.key_name = SEAL_KEY;
+
+        // get 1st half of 256 bit platform ID
+        if(sgx_getkey(&platIdKeyRequest, &key[0]) != 0)
+        {
+            fprintf(stderr, "EGETKEY 0 failed\n");
+            return false;
+        }
+
+        // get 2nd half of 256 bit platform ID
+        platIdKeyRequest.key_id[0] = 23;
+        if(sgx_getkey(&platIdKeyRequest, &key[1]) != 0)
+        {
+            fprintf(stderr, "EGETKEY 1 failed\n");
+            return false;
+        }
+
+        // copy 256 bit into caller buffer (which might be unaligned)
+        memcpy((void*)platformID, (void*)key, 32);
+
+        return true;
+    }
+
+    return false;
+}
+
+//*** _rpc__SGX_Quote()
+// Use graphene pseudo file-system to retrieve a quote
+bool
+_rpc__SGX_Quote(
+    uint8_t *userReportData,
+    uint8_t *quote
+)
+{
+    // If TPM power is on...
+    if (s_isPowerOn)
+    {
+        ssize_t bytes;
+
+        // write user data
+        bytes = rw_file_f("/dev/attestation/user_report_data", (char*)userReportData, SGX_REPORT_DATA_SIZE, true);
+        if (bytes != SGX_REPORT_DATA_SIZE) {
+            // error is already printed by rw_file_f()
+            return false;
+        }
+
+        // read back quote
+        bytes = rw_file_f("/dev/attestation/quote", (char*)quote, sizeof(SGX_QUOTE_MAX_SIZE), false);
+        if (bytes < 0) {
+            // error is already printed by rw_file_f()
+            return false;
+        }
+
+        // verify report data read from quote
+        if (bytes < sizeof(sgx_quote_t)) {
+            fprintf(stderr, "obtained SGX quote is too small: %ldB (must be at least %ldB)\n", bytes,
+                    sizeof(sgx_quote_t));
+            return false;
+        }
+
+        sgx_quote_t* typed_quote = (sgx_quote_t*)quote;
+
+        if (typed_quote->version != /*EPID*/2 && typed_quote->version != /*DCAP*/3) {
+            fprintf(stderr, "version of SGX quote is not EPID (2) and not ECDSA/DCAP (3)\n");
+            return false;
+        }
+
+        int ret = memcmp(typed_quote->report_body.report_data.d, user_report_data.d,
+                        sizeof(user_report_data));
+        if (ret) {
+            fprintf(stderr, "comparison of report data in SGX quote failed\n");
+            return false;
+        }
+
+        return true;
+    }
+
+    return false;
+}

@@ -86,6 +86,12 @@
 
 #define TPM_TEST_FAILURE_MODE       30
 
+// immune protocol extensions
+// ---
+#define TPM_GET_PLATFORM_ID         0xCAFE0
+#define TPM_GET_SGX_QUOTE           0xCAFE1
+// ---
+
 //** Enumerations and Structures
 enum TpmEndPointInfo
 {

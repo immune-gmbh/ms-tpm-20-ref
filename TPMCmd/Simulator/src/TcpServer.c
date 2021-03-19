@@ -42,6 +42,9 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+// need SGX defines
+#include "sgx_arch.h"
+
 #ifdef _MSC_VER
 #   pragma warning(push, 3)
 #   include <windows.h>
@@ -229,6 +232,51 @@ PlatformServer(
                 WriteUINT32(s, _rpc__ACT_GetSignaled(actHandle));
                 break;
             }
+
+            // immune protocol extensions
+            // ---
+            case TPM_GET_PLATFORM_ID:
+            {
+                uint8_t platID[32];
+                OK = _rpc__SGX_PlatformID(platID);
+                if(OK)
+                {
+                    // return a 256 bit platform identifier
+                    WriteBytes(s, (char*)platID, sizeof(platID));
+                }
+
+                // close connection in case of error instead of
+                // returning invalid data
+                if(!OK)
+                    return true;
+
+                break;
+            }
+            
+            case TPM_GET_SGX_QUOTE:
+            {
+                uint8_t userReportData[SGX_REPORT_DATA_SIZE];
+                uint8_t quote[SGX_QUOTE_MAX_SIZE];
+
+                OK = ReadBytes(s, userReportData, sizeof(userReportData));
+
+                // close connection in case of error instead of
+                // returning invalid data
+                if(!OK)
+                    return true;
+
+                OK = _rpc__SGX_Quote(userReportData, quote);
+                if(!OK)
+                    return true;
+
+                // return the quote
+                WriteBytes(s, (char*)quote, sizeof(quote));
+
+                break;
+            }
+            // ---
+            // immune protocol extensions
+
             default:
                 printf("Unrecognized platform interface command %d\n", 
                        (int)Command);

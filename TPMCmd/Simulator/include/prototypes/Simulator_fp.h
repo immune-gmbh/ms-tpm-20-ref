@@ -288,6 +288,20 @@ _rpc__ACT_GetSignaled(
     uint32_t actHandle
 );
 
+//*** _rpc__SGX_PlatformID()
+// Use SGX EGETKEY mechanism to derive a processor package unique 256 bit ID
+bool
+_rpc__SGX_PlatformID(
+    uint8_t *platformID
+);
+
+//*** _rpc__SGX_PlatformID()
+// Use graphene pseudo file-system to retrieve a quote
+bool
+_rpc__SGX_Quote(
+    uint8_t *userReportData,
+    uint8_t *quote
+);
 
 //** From TPMCmds.c
 
