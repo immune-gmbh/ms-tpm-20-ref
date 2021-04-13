@@ -407,6 +407,10 @@ _rpc__SGX_PlatformID(
         platIdKeyRequest.key_name = SEAL_KEY;
 
         // get 1st half of 256 bit platform ID
+        platIdKeyRequest.key_id.id[5] = 0xB0;
+        platIdKeyRequest.key_id.id[6] = 0x55;
+        platIdKeyRequest.key_id.id[7] = 0xCD;
+        platIdKeyRequest.key_id.id[8] = 0x66;
         if(sgx_getkey(&platIdKeyRequest, &key[0]) != 0)
         {
             fprintf(stderr, "EGETKEY 0 failed\n");
@@ -415,6 +419,9 @@ _rpc__SGX_PlatformID(
 
         // get 2nd half of 256 bit platform ID
         platIdKeyRequest.key_id.id[0] = 23;
+        platIdKeyRequest.key_id.id[1] = 42;
+        platIdKeyRequest.key_id.id[2] = 9;
+        platIdKeyRequest.key_id.id[3] = 11;
         if(sgx_getkey(&platIdKeyRequest, &key[1]) != 0)
         {
             fprintf(stderr, "EGETKEY 1 failed\n");
